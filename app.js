@@ -3,8 +3,10 @@ const bodyParser = require('body-parser');
 const { buildSchema } = require('graphql');
 const graphQLHttp = require('express-graphql');
 const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
 
 const Product = require('./models/product');
+const User = require('./models/user');
 
 const app = express();
 
@@ -28,6 +30,17 @@ app.use(
                 price: Float!
                 quantity: Int!
             }
+
+            type User{
+                _id: ID!
+                email: String!
+                password: String
+            }
+
+            input UserInput{
+                email: String!
+                password: String!
+            }
             
             type RootQuery {
                 products: [Product!]!
@@ -35,6 +48,7 @@ app.use(
 
             type RootMutation {
                 createProduct(productInput: ProductInput): Product
+                createUser(userInput: UserInput): User
             }
 
             schema {
@@ -46,7 +60,9 @@ app.use(
             products: () => {
                 return Product.find()
                     .then(products => {
-                        return products;
+                        return products.map(product => {
+                            return {...product._doc, _id: product.id}
+                        });
                     })
                     .catch((err) => {
                         throw err;
@@ -58,16 +74,51 @@ app.use(
                     name: args.productInput.name,
                     description: args.productInput.description,
                     price: +args.productInput.price,
-                    quantity: args.productInput.quantity
+                    quantity: args.productInput.quantity,
+                    creator: "5c6b33743029a00610b7968e"
                 });
+                let createdProduct;
                 return product
                     .save()
                     .then(result => {
-                        return result;
+                        createdProduct = {...result._doc, _id: result._doc._id.toString()};
+                        return User.findById('5c6b33743029a00610b7968e');
+                    })
+                    .then(user => {
+                        if(!user){
+                            throw new Error('User with specified ID not found');
+                        }
+                        user.createdProducts.push(product);
+                        return user.save();
+                    })
+                    .then(result => {
+                        return createdProduct;
                     })
                     .catch(err => {
                         throw err;
                         console.log(err);
+                    });
+            },
+            createUser: (args) => {
+                return User.findOne({email: args.userInput.email})
+                    .then(user => {
+                        if(user){
+                            throw new Error('Email is already in use.');
+                        }
+                        return bcrypt.hash(args.userInput.password, 12);
+                    })
+                    .then(hashedPassword => {
+                        const user = new User({
+                            email: args.userInput.email,
+                            password: hashedPassword
+                        });
+                        return user.save();
+                    })
+                    .then(result => {
+                        return {...result._doc, password: null, _id: result.id};
+                    })
+                    .catch(err => {
+                        throw err;
                     });
             }
         },
@@ -76,9 +127,6 @@ app.use(
 );
 
 const connectionString = `mongodb+srv://${process.env.MONGO_USER}:${process.env.MONGO_PASSWORD}@rest-api-cluster-3goja.mongodb.net/${process.env.MONGO_DB}?retryWrites=true`;
-
-console.log(connectionString);
-
 mongoose
     .connect(connectionString)
     .then(() => {
