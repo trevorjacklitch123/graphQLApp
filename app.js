@@ -2,10 +2,11 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const { buildSchema } = require('graphql');
 const graphQLHttp = require('express-graphql');
+const mongoose = require('mongoose');
+
+const Product = require('./models/product');
 
 const app = express();
-
-const products = [];
 
 app.use(bodyParser.json());
 
@@ -43,22 +44,46 @@ app.use(
         `),
         rootValue: {
             products: () => {
-                return products;
+                return Product.find()
+                    .then(products => {
+                        return products;
+                    })
+                    .catch((err) => {
+                        throw err;
+                        console.log(err);
+                    });
             },
             createProduct: (args) => {
-                const product = {
-                    _id: Math.random() * 100,
+                const product = new Product({
                     name: args.productInput.name,
                     description: args.productInput.description,
-                    price: args.productInput.price,
+                    price: +args.productInput.price,
                     quantity: args.productInput.quantity
-                };
-                products.push(product);
-                return product;
+                });
+                return product
+                    .save()
+                    .then(result => {
+                        return result;
+                    })
+                    .catch(err => {
+                        throw err;
+                        console.log(err);
+                    });
             }
         },
         graphiql: true
     })
 );
 
-app.listen(4000);
+const connectionString = `mongodb+srv://${process.env.MONGO_USER}:${process.env.MONGO_PASSWORD}@rest-api-cluster-3goja.mongodb.net/${process.env.MONGO_DB}?retryWrites=true`;
+
+console.log(connectionString);
+
+mongoose
+    .connect(connectionString)
+    .then(() => {
+        app.listen(4000);
+    })
+    .catch((err) => {
+        console.log(err);
+    });
