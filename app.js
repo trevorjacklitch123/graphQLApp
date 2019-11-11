@@ -125,10 +125,10 @@ app.use(
         graphiql: true
     })
 );
-
-const connectionString = `mongodb+srv://${process.env.MONGO_USER}:${process.env.MONGO_PASSWORD}@rest-api-cluster-3goja.mongodb.net/${process.env.MONGO_DB}?retryWrites=true`;
+//mongodb+srv://trevorjacklitch123:<password>@rest-api-cluster-3goja.mongodb.net/test?retryWrites=true&w=majority
+const connectionString = `mongodb+srv://${process.env.MONGO_USER}:${process.env.MONGO_PASSWORD}@rest-api-cluster-3goja.mongodb.net/${process.env.MONGO_DB}?retryWrites=true&w=majority`;
 mongoose
-    .connect(connectionString)
+    .connect(connectionString, { useNewUrlParser: true })
     .then(() => {
         app.listen(4000);
     })
